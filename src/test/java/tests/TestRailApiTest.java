@@ -5,10 +5,22 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.Disabled;
-
 import org.junit.jupiter.api.DisplayName;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 
 public class TestRailApiTest {
+    private static final String API = "/index.php?/api/v2/";
+    private static final String GET_CASE = "get_case/";
+    private static final String GET_CASES = "get_cases/";
+    private static final String ADD_CASE = "add_case/";
+    private static final String UPDATE_CASE = "update_case/";
+    private static final String DELETE_CASE = "delete_case/";
+    private static final String GET_HISTORY_FOR_CASE = "get_history_for_case/";
+    private static final String MOVE_CASES_TO_SECTION = "move_cases_to_section/";
+
     @Test
     @DisplayName("API-01 Получение информации о тест-кейсе")
     void getCase() {
@@ -18,7 +30,7 @@ public class TestRailApiTest {
                 .preemptive()
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .when()
-                .get("/index.php?/api/v2/get_case/131")
+                .get(API + GET_CASE + "131")
                 .then()
                 .statusCode(200)
                 .body("id", equalTo(131))
@@ -34,7 +46,7 @@ public class TestRailApiTest {
                     .preemptive()
                     .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .when()
-                    .get("/index.php?/api/v2/get_cases/" + ApiConfig.PROJECT_ID + "&suite_id=" + ApiConfig.SUITE_ID)
+                    .get(API + GET_CASES + ApiConfig.PROJECT_ID + "&suite_id=" + ApiConfig.SUITE_ID)
                 .then()
                     .statusCode(200)
                     .body("cases", notNullValue())
@@ -44,20 +56,18 @@ public class TestRailApiTest {
 
     @Test
     @DisplayName("API-03 Создание тест-кейса")
-    void addCase() {
+    void addCase() throws Exception {
         Response response = given()
                 .baseUri(ApiConfig.BASE_URL)
                 .auth()
                 .preemptive()
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .contentType("application/json")
-                .body(""" 
-                        {                                        
-                        "title": "Тест-кейс созданный через API"              
-                        }
-                          """)
+                .body(Files.readString(
+                        Path.of("src/test/resources/json/addCase.json"),
+                        StandardCharsets.UTF_8))
                 .when()
-                .post("/index.php?/api/v2/add_case/" + ApiConfig.SECTION_ID);
+                .post(API + ADD_CASE + ApiConfig.SECTION_ID);
                 response.then()
                 .statusCode(200)
                 .body("id", notNullValue())
@@ -74,13 +84,9 @@ public class TestRailApiTest {
                         .preemptive()
                         .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                         .contentType("application/json")
-                        .body(""" 
-                        {
-                          "title": "Тест-кейст созданный и удаленный через API"
-                          }
-                        """)
+                        .body(new File("src/test/resources/json/deleteCase.json"))
                         .when()
-                        .post("/index.php?/api/v2/add_case/" + ApiConfig.SECTION_ID);
+                        .post(API + ADD_CASE + ApiConfig.SECTION_ID);
                 int caseId = response.jsonPath().getInt("id");
                 Response deleteResponse = given()
                         .baseUri(ApiConfig.BASE_URL)
@@ -89,7 +95,7 @@ public class TestRailApiTest {
                         .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                         .contentType("application/json")
                         .when()
-                        .post("/index.php?/api/v2/delete_case/" + caseId);
+                        .post(API + DELETE_CASE + caseId);
                 deleteResponse.then()
                         .statusCode(200)
                         .body(emptyString());
@@ -104,13 +110,9 @@ public class TestRailApiTest {
                 .preemptive()
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .contentType("application/json")
-                .body(""" 
-                      {
-                      "title": "Тест-кейс для обновления через API"
-                      }
-                      """)
+                .body(new File("src/test/resources/json/createUpdateCase.json"))
                 .when()
-                .post("/index.php?/api/v2/add_case/" + ApiConfig.SECTION_ID);
+                .post(API + ADD_CASE + ApiConfig.SECTION_ID);
                 int caseId = response.jsonPath().getInt("id");
                 given()
                         .baseUri(ApiConfig.BASE_URL)
@@ -118,12 +120,9 @@ public class TestRailApiTest {
                         .preemptive()
                         .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                         .contentType("application/json")
-                        .body(""" 
-                            { "title": "Обновленный через API тест-кейс"
-                            }
-                          """)
+                        .body(new File("src/test/resources/json/updateCase.json"))
                         .when()
-                        .post("/index.php?/api/v2/update_case/" + caseId)
+                        .post(API + UPDATE_CASE + caseId)
                         .then()
                         .statusCode(200)
                         .body("title", equalTo("Обновленный через API тест-кейс"));
@@ -137,13 +136,9 @@ public class TestRailApiTest {
                 .preemptive()
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .contentType("application/json")
-                .body(""" 
-
-                        { "title": "Тест-кейс для проверки истории через API"
-                      }
-                      """)
+                .body(new File("src/test/resources/json/historyCase.json"))
                 .when()
-                .post("/index.php?/api/v2/add_case/" + ApiConfig.SECTION_ID);
+                .post(API + ADD_CASE + ApiConfig.SECTION_ID);
         int caseId = response.jsonPath().getInt("id");
         given()
                 .baseUri(ApiConfig.BASE_URL)
@@ -152,7 +147,7 @@ public class TestRailApiTest {
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .contentType("application/json")
                 .when()
-                .get("/index.php?/api/v2/get_history_for_case/" + caseId)
+                .get(API + GET_HISTORY_FOR_CASE + caseId)
                 .then()
                 .statusCode(200)
                 .body("history", notNullValue());
@@ -160,30 +155,29 @@ public class TestRailApiTest {
 
     @Test
     @DisplayName("API-07 Перенос тест-кейса в другую секцию")
-    void moveTestCase() {
+    void moveTestCase() throws Exception {
         Response response = given()
                 .baseUri(ApiConfig.BASE_URL)
                 .auth()
                 .preemptive()
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .contentType("application/json")
-                .body(""" 
-                      {
-                      "title": "Тест кейс для переноса через API"                                            
-                      }
-                      """)
+                .body(new File("src/test/resources/json/moveCase.json"))
                 .when()
-                .post("/index.php?/api/v2/add_case/" + ApiConfig.SECTION_ID);
+                .post(API + ADD_CASE + ApiConfig.SECTION_ID);
                 int caseId = response.jsonPath().getInt("id");
+        String moveBody = Files.readString(
+                Path.of("src/test/resources/json/moveCasesToSection.json"));
+        moveBody = moveBody.formatted(caseId);
                 given()
                         .baseUri(ApiConfig.BASE_URL)
                         .auth()
                         .preemptive()
                         .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                         .contentType("application/json")
-                        .body("{\"case_ids\": [" + caseId + "]}")
+                        .body(moveBody)
                         .when()
-                        .post("/index.php?/api/v2/move_cases_to_section/" + ApiConfig.TARGET_SECTION_ID)
+                        .post(API + MOVE_CASES_TO_SECTION + ApiConfig.TARGET_SECTION_ID)
                         .then()
                         .statusCode(200)
                         .body(emptyString());
@@ -194,7 +188,7 @@ public class TestRailApiTest {
         given()
                 .baseUri(ApiConfig.BASE_URL)
                 .when()
-                .get("/index.php?/api/v2/get_cases/" + ApiConfig.PROJECT_ID
+                .get(API + GET_CASES + ApiConfig.PROJECT_ID
                         + "&suite_id=" + ApiConfig.SUITE_ID)
                 .then()
                 .statusCode(401)
@@ -207,12 +201,11 @@ public class TestRailApiTest {
         given()
                 .baseUri(ApiConfig.BASE_URL)
                 .redirects().follow(false)
-                .redirects().follow(false)
                 .auth()
                 .preemptive()
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .when()
-                .get("/index.php?/api/v2/get_case/999")
+                .get(API + GET_CASE + "abv3")
                 .then()
                 .statusCode(400)
                 .body("error", notNullValue());
@@ -227,7 +220,7 @@ public class TestRailApiTest {
                 .preemptive()
                 .basic(ApiConfig.EMAIL, ApiConfig.API_KEY)
                 .when()
-                .get("/index.php?/api/v2/get_case_wrong/")
+                .get(API + "invalidEndPoint/")
                 .then()
                 .statusCode(404)
                 .body("error", notNullValue());
